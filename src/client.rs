@@ -15,10 +15,26 @@ use crate::{
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub enum RakClientMsg {
+enum RakClientMsg {
     Connect(SocketAddr),
     Packet(BytesMut),
     Disconnect,
+}
+
+pub struct ClientHandle {
+    addr: Recipient<RakClientMsg>,
+}
+
+impl ClientHandle {
+    pub fn connect(&self, address: SocketAddr) {
+        self.addr.do_send(RakClientMsg::Connect(address)).unwrap();
+    }
+    pub fn packet(&self, bytes: BytesMut) {
+        self.addr.do_send(RakClientMsg::Packet(bytes)).unwrap();
+    }
+    pub fn disconnect(&self) {
+        self.addr.do_send(RakClientMsg::Disconnect).unwrap();
+    }
 }
 
 pub enum ConnectionFailedReason {
@@ -58,13 +74,9 @@ where
     T: Handler<RakClientEvent>,
     <T as actix::Actor>::Context: ToEnvelope<T, RakClientEvent>,
 {
-    pub fn new(socket: tokio::net::UdpSocket, guid: u64, handler: Addr<T>) -> Addr<Self> {
-        Self::init(socket, guid, handler)
-    }
-
-    fn init(socket: tokio::net::UdpSocket, guid: u64, handler: Addr<T>) -> Addr<Self> {
+    pub fn init(socket: tokio::net::UdpSocket, guid: u64, handler: Addr<T>) -> ClientHandle {
         let (sink, stream) = UdpFramed::new(socket, BytesCodec::new()).split();
-        Self::create(|ctx| Self {
+        let addr = Self::create(|ctx| Self {
             udp: UdpActor::create(|ctx2| {
                 ctx2.add_stream(stream.filter_map(
                     |item: std::io::Result<(BytesMut, SocketAddr)>| async {
@@ -87,7 +99,10 @@ where
             tick_handle: None,
             remote: None,
             disconnect_handle: None,
-        })
+        });
+        ClientHandle {
+            addr: addr.recipient::<RakClientMsg>(),
+        }
     }
 }
 

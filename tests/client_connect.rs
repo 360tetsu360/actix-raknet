@@ -1,16 +1,16 @@
 use std::net::SocketAddr;
 
 use actix::prelude::*;
-use futures::executor::block_on;
 use actix_raknet::{
-    client::{RakClient, RakClientEvent, RakClientMsg},
+    client::{ClientHandle, RakClient, RakClientEvent},
     packets::{
         encode, AlreadyConnected, IncompatibleProtocolVersion, OpenConnectionReply1,
         OpenConnectionReply2, OpenConnectionRequest1, OpenConnectionRequest2, Packet,
     },
 };
+use futures::executor::block_on;
 struct Client {
-    rak_client: Addr<RakClient<Self>>,
+    rak_client: ClientHandle,
 }
 
 impl Actor for Client {
@@ -20,8 +20,8 @@ impl Actor for Client {
 impl Handler<RakClientEvent> for Client {
     type Result = ();
     fn handle(&mut self, msg: RakClientEvent, _ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            RakClientEvent::ConnectionFailed(reason) => match reason {
+        if let RakClientEvent::ConnectionFailed(reason) = msg {
+            match reason {
                 actix_raknet::client::ConnectionFailedReason::AlreadyConnected => {
                     println!("already connected");
                 }
@@ -31,8 +31,7 @@ impl Handler<RakClientEvent> for Client {
                 actix_raknet::client::ConnectionFailedReason::Timeout => {
                     println!("timeout");
                 }
-            },
-            _ => {}
+            }
         }
         System::current().stop()
     }
@@ -42,7 +41,7 @@ impl Handler<Connect> for Client {
     type Result = ();
 
     fn handle(&mut self, msg: Connect, _ctx: &mut Self::Context) -> Self::Result {
-        self.rak_client.do_send(RakClientMsg::Connect(msg.0));
+        self.rak_client.connect(msg.0);
     }
 }
 
@@ -53,7 +52,7 @@ struct Connect(SocketAddr);
 async fn creat_client(guid: u64, addr: SocketAddr) -> Addr<Client> {
     let socket = tokio::net::UdpSocket::bind(addr).await.unwrap();
     Client::create(|ctx| {
-        let rak_client = RakClient::new(socket, guid, ctx.address());
+        let rak_client = RakClient::init(socket, guid, ctx.address());
         Client { rak_client }
     })
 }

@@ -1,14 +1,14 @@
 use actix::prelude::*;
-use bytes::BytesMut;
-use futures::executor::block_on;
 use actix_raknet::{
-    client::{RakClient, RakClientEvent, RakClientMsg},
+    client::{ClientHandle, RakClient, RakClientEvent},
     server::{ConnectionHandle, RakServer, RakServerEvent},
 };
+use bytes::BytesMut;
+use futures::executor::block_on;
 use std::net::SocketAddr;
 
 struct Client {
-    rak_client: Addr<RakClient<Self>>,
+    rak_client: ClientHandle,
     server: Addr<Server>,
 }
 
@@ -40,13 +40,13 @@ impl Handler<ClientOrder> for Client {
     fn handle(&mut self, msg: ClientOrder, _ctx: &mut Self::Context) -> Self::Result {
         match msg {
             ClientOrder::Connect(addr) => {
-                self.rak_client.do_send(RakClientMsg::Connect(addr));
+                self.rak_client.connect(addr);
             }
             ClientOrder::Disconnect => {
-                self.rak_client.do_send(RakClientMsg::Disconnect);
+                self.rak_client.disconnect();
             }
             ClientOrder::Packet(buff) => {
-                self.rak_client.do_send(RakClientMsg::Packet(buff));
+                self.rak_client.packet(buff);
             }
         }
     }
@@ -87,11 +87,7 @@ impl Handler<RakServerEvent> for Server {
                 let server_guid = handle.guid;
                 let socket = block_on(tokio::net::UdpSocket::bind(local_addr)).unwrap();
                 self.client = Some(Client::create(|ctx| {
-                    let rak_client = RakClient::new(
-                        socket,
-                        server_guid,
-                        ctx.address(),
-                    );
+                    let rak_client = RakClient::init(socket, server_guid, ctx.address());
                     Client {
                         rak_client,
                         server: sctx.address(),
@@ -141,12 +137,7 @@ async fn main() {
     let server_guid = 114514;
     let socket = tokio::net::UdpSocket::bind(local_addr).await.unwrap();
     let _handler = Server::create(|ctx| {
-        let _rak_server = RakServer::new(
-            socket,
-            server_guid,
-            motd,
-            ctx.address(),
-        );
+        let _rak_server = RakServer::new(socket, server_guid, motd, ctx.address());
         Server {
             _rak_server,
             client: None,
