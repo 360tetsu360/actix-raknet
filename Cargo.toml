@@ -1,0 +1,18 @@
+[package]
+name = "actix-raknet"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix = "0.10"
+actix-rt = "1.1.1"
+tokio = "0.2"
+tokio-util = { version = "0.3", features = [ "codec", "udp" ] }
+futures = "0.3"
+futures-util = "0.3"
+bytes = "0.5"
+async-trait = "0.1.52"
+actix-codec = "0.3"
+byteorder = "1.4.3"
