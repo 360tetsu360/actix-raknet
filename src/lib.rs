@@ -3,6 +3,7 @@ pub(crate) mod macros;
 pub(crate) mod packet;
 pub(crate) mod packetqueue;
 pub mod packets;
+pub mod ping;
 pub(crate) mod reader;
 pub(crate) mod receivedqueue;
 pub mod server;

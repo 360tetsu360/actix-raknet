@@ -66,7 +66,7 @@ impl<'a> Reader<'a> {
 
     pub fn read_string(&'a mut self) -> Result<String> {
         let size = self.read_u16(Endian::Big)?;
-        let mut strbuf = Vec::with_capacity(size.into());
+        let mut strbuf = vec![0u8; size.into()];
         self.read(&mut strbuf)?;
         match String::from_utf8(strbuf) {
             Ok(p) => Ok(p),

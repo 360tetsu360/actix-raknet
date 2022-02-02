@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use actix::prelude::*;
 use actix_raknet::{
     client::{ClientHandle, RakClient, RakClientEvent},
+    packets::{encode, IncompatibleProtocolVersion, OpenConnectionRequest1, Packet},
     server::{RakServer, RakServerEvent},
 };
 use futures::executor::block_on;
@@ -85,5 +86,27 @@ fn already_connected() {
         let client2_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let client2 = block_on(create_client(114514, client2_addr));
         client2.do_send(Connect(server_addr));
+    }).unwrap();
+}
+
+#[test]
+fn different_version_server() {
+    System::run(||{
+        let server_addr: SocketAddr = "127.0.0.1:19133".parse().unwrap();
+        block_on(create_server(0x1919, server_addr, "MCPE;§5raknet rs;390;1.17.42;0;10;13253860892328930865;Bedrock level;Survival;1;19132;19133;".to_owned()));
+
+        tokio::spawn(async move {
+            let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+            let mut socket = tokio::net::UdpSocket::bind(addr).await.unwrap();
+            let connectionreq = OpenConnectionRequest1::new(0xFF, 1498);
+            let payload = encode(connectionreq);
+            socket.send_to(&payload, server_addr).await.unwrap();
+
+            let mut buff = [0u8;1500];
+            let _ = socket.recv(&mut buff).await.unwrap();
+            if buff[0] == IncompatibleProtocolVersion::ID {
+                System::current().stop();
+            }
+        });
     }).unwrap();
 }

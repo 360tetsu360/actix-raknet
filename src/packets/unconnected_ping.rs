@@ -14,7 +14,7 @@ pub struct UnconnectedPing {
 }
 
 impl UnconnectedPing {
-    pub fn _new(time: i64, guid: u64) -> Self {
+    pub fn new(time: i64, guid: u64) -> Self {
         Self {
             time,
             _magic: true,

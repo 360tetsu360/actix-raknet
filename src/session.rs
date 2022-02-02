@@ -85,29 +85,28 @@ where
     fn flush_queue(&mut self) {
         for send_able in self.packet_queue.get_packet() {
             let frame_set = send_able.encode();
-            self.udp
-                .do_send(SendUdp(UdpPacket {
-                    bytes: frame_set,
-                    addr: self.addr,
-                }))
-                .unwrap();
+            unwrap_or_return!(self.udp.do_send(SendUdp(UdpPacket {
+                bytes: frame_set,
+                addr: self.addr,
+            })));
         }
     }
     fn flush_ack(&mut self) {
-        let acks = self.ack_queue.get_send_able_and_clear();
+        let (acks, nacks) = self.ack_queue.clear();
         for ack in acks {
             self.send_ack(ack);
+        }
+        for miss in nacks {
+            self.send_nack(miss);
         }
     }
     fn send_ack(&mut self, packet: (u32, u32)) {
         let ack = Ack::new(packet);
         let buff = encode(ack);
-        self.udp
-            .do_send(SendUdp(UdpPacket {
-                bytes: buff,
-                addr: self.addr,
-            }))
-            .unwrap();
+        unwrap_or_return!(self.udp.do_send(SendUdp(UdpPacket {
+            bytes: buff,
+            addr: self.addr,
+        })));
     }
     fn handle_ack(&mut self, buff: &BytesMut) {
         let ack = unwrap_or_return!(decode::<Ack>(buff));
@@ -124,23 +123,16 @@ where
     fn handle_datagram(&mut self, buff: &BytesMut) {
         let frame_set = unwrap_or_return!(FrameSet::decode(buff));
         self.ack_queue.add(frame_set.sequence_number);
-        if self.ack_queue.get_missing_len() != 0 {
-            for miss in self.ack_queue.get_missing() {
-                self.send_nack(miss);
-            }
-        }
         for frame in frame_set.datas {
             self.receive_packet(frame)
         }
     }
     fn send_nack(&mut self, miss: u32) {
         let nack = Nack::new((miss, miss));
-        self.udp
-            .do_send(SendUdp(UdpPacket {
-                bytes: encode(nack),
-                addr: self.addr,
-            }))
-            .unwrap();
+        unwrap_or_return!(self.udp.do_send(SendUdp(UdpPacket {
+            bytes: encode(nack),
+            addr: self.addr,
+        })));
     }
     fn send_ping(&mut self) {
         let connected_ping = ConnectedPing::new(time() as i64);

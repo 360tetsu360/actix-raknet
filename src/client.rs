@@ -27,13 +27,13 @@ pub struct ClientHandle {
 
 impl ClientHandle {
     pub fn connect(&self, address: SocketAddr) {
-        self.addr.do_send(RakClientMsg::Connect(address)).unwrap();
+        unwrap_or_return!(self.addr.do_send(RakClientMsg::Connect(address)));
     }
     pub fn packet(&self, bytes: BytesMut) {
-        self.addr.do_send(RakClientMsg::Packet(bytes)).unwrap();
+        unwrap_or_return!(self.addr.do_send(RakClientMsg::Packet(bytes)));
     }
     pub fn disconnect(&self) {
-        self.addr.do_send(RakClientMsg::Disconnect).unwrap();
+        unwrap_or_return!(self.addr.do_send(RakClientMsg::Disconnect));
     }
 }
 
@@ -333,30 +333,26 @@ impl ClientMediator {
         } else if (8..13).contains(&self.request1_count) {
             mtu_size = 584;
         } else {
-            self.timeout();
+            self.timeout(ctx);
             return;
         }
         self.request1_count += 1;
 
         let request1 = OpenConnectionRequest1::new(RAKNET_PROTOCOL_VERSION, mtu_size);
 
-        self.udp
-            .do_send(SendUdp(UdpPacket {
-                bytes: encode(request1),
-                addr: self.address,
-            }))
-            .unwrap();
+        unwrap_or_return!(self.udp.do_send(SendUdp(UdpPacket {
+            bytes: encode(request1),
+            addr: self.address,
+        })));
         self.next_request1_handle =
             Some(ctx.run_later(Duration::from_millis(510), |me, ctx| me.request1(ctx)));
     }
     fn request2(&mut self, mtu: u16, ctx: &mut Context<Self>) {
         let request2 = OpenConnectionRequest2::new(self.address, mtu, self.guid);
-        self.udp
-            .do_send(SendUdp(UdpPacket {
-                bytes: encode(request2),
-                addr: self.address,
-            }))
-            .unwrap();
+        unwrap_or_return!(self.udp.do_send(SendUdp(UdpPacket {
+            bytes: encode(request2),
+            addr: self.address,
+        })));
         self.next_request1_handle =
             Some(ctx.run_later(Duration::from_millis(510), |me, ctx| me.request1(ctx)));
     }
@@ -364,29 +360,33 @@ impl ClientMediator {
         if let Some(handle) = self.disconnect_timer {
             ctx.cancel_future(handle);
             self.disconnect_timer = None;
-            self.parent.do_send(MediatorEvent::Success(mtu)).unwrap();
+            self.event(MediatorEvent::Success(mtu), ctx);
         }
     }
-    fn timeout(&mut self) {
-        self.parent.do_send(MediatorEvent::Timeout).unwrap();
+    fn timeout(&mut self, ctx: &mut Context<Self>) {
+        self.event(MediatorEvent::Timeout, ctx);
     }
-    fn already_connected(&mut self) {
-        self.parent
-            .do_send(MediatorEvent::AlreadyConnected)
-            .unwrap();
+    fn already_connected(&mut self, ctx: &mut Context<Self>) {
+        self.event(MediatorEvent::AlreadyConnected, ctx);
     }
-    fn different_version(&mut self) {
-        self.parent
-            .do_send(MediatorEvent::DifferentVersion)
-            .unwrap();
+    fn different_version(&mut self, ctx: &mut Context<Self>) {
+        self.event(MediatorEvent::DifferentVersion, ctx);
+    }
+
+    fn event(&mut self, event: MediatorEvent, ctx: &mut Context<Self>) {
+        self.parent.do_send(event).unwrap_or_else(|e| {
+            if let SendError::Closed(_event) = e {
+                ctx.terminate()
+            }
+        });
     }
 }
 
 impl Actor for ClientMediator {
     type Context = Context<Self>;
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.disconnect_timer = Some(ctx.run_later(Duration::from_secs(10), |me, _ctx| {
-            me.timeout();
+        self.disconnect_timer = Some(ctx.run_later(Duration::from_secs(10), |me, ctx| {
+            me.timeout(ctx);
         }));
         self.request1(ctx);
     }
@@ -398,7 +398,7 @@ impl Handler<ReceivedUdp> for ClientMediator {
         match msg.0.bytes[0] {
             OpenConnectionReply1::ID => {
                 if let Some(handle) = self.next_request1_handle {
-                    let reply1 = decode::<OpenConnectionReply1>(&msg.0.bytes).unwrap();
+                    let reply1 = unwrap_or_return!(decode::<OpenConnectionReply1>(&msg.0.bytes));
                     ctx.cancel_future(handle);
                     self.next_request1_handle = None;
                     self.request2(reply1.mtu_size, ctx);
@@ -406,7 +406,7 @@ impl Handler<ReceivedUdp> for ClientMediator {
             }
             OpenConnectionReply2::ID => {
                 if let Some(handle) = self.next_request1_handle {
-                    let reply2 = decode::<OpenConnectionReply2>(&msg.0.bytes).unwrap();
+                    let reply2 = unwrap_or_return!(decode::<OpenConnectionReply2>(&msg.0.bytes));
                     ctx.cancel_future(handle);
                     self.next_request1_handle = None;
                     self.success(reply2.mtu + 96, ctx);
@@ -414,18 +414,19 @@ impl Handler<ReceivedUdp> for ClientMediator {
             }
             AlreadyConnected::ID => {
                 if let Some(handle) = self.next_request1_handle {
-                    let _packet = decode::<AlreadyConnected>(&msg.0.bytes).unwrap();
+                    let _packet = unwrap_or_return!(decode::<AlreadyConnected>(&msg.0.bytes));
                     ctx.cancel_future(handle);
                     self.next_request1_handle = None;
-                    self.already_connected();
+                    self.already_connected(ctx);
                 }
             }
             IncompatibleProtocolVersion::ID => {
                 if let Some(handle) = self.next_request1_handle {
-                    let _packet = decode::<IncompatibleProtocolVersion>(&msg.0.bytes).unwrap();
+                    let _packet =
+                        unwrap_or_return!(decode::<IncompatibleProtocolVersion>(&msg.0.bytes));
                     ctx.cancel_future(handle);
                     self.next_request1_handle = None;
-                    self.different_version();
+                    self.different_version(ctx);
                 }
             }
             _ => {}

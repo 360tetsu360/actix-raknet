@@ -128,6 +128,7 @@ where
                         bytes: encode(protocol_version),
                         addr: msg.0.addr,
                     }));
+                    return;
                 }
                 let reply = OpenConnectionReply1::new(self.guid, false, request1.mtu_size);
                 self.udp.do_send(SendUdp(UdpPacket {
@@ -231,6 +232,13 @@ impl ServerConn {
     fn disconnect(&mut self) {
         self.session.disconnect()
     }
+    fn event(&mut self, event: RakServerEvent, ctx: &mut Context<Self>) {
+        self.handler.do_send(event).unwrap_or_else(|e| {
+            if let SendError::Closed(_event) = e {
+                ctx.terminate()
+            }
+        });
+    }
 }
 
 impl Actor for ServerConn {
@@ -272,9 +280,7 @@ impl Handler<ReceivedDatagram> for ServerConn {
                         address: self.addr,
                         guid: self.guid,
                     };
-                    self.handler
-                        .do_send(RakServerEvent::Connected(my_handle))
-                        .unwrap();
+                    self.event(RakServerEvent::Connected(my_handle), ctx);
                     ctx.cancel_future(handle);
                     self.disconnect_handle = None;
                 }
@@ -287,21 +293,15 @@ impl Handler<ReceivedDatagram> for ServerConn {
             address: self.addr,
             guid: self.guid,
         };
-        self.handler
-            .do_send(RakServerEvent::Packet(my_handle, msg.0.data))
-            .unwrap();
+        self.event(RakServerEvent::Packet(my_handle, msg.0.data), ctx);
     }
 }
 
 impl Handler<SessionEnd> for ServerConn {
     type Result = ();
     fn handle(&mut self, _msg: SessionEnd, ctx: &mut Self::Context) -> Self::Result {
-        self.server
-            .do_send(ConnectionEnd(self.addr, self.guid))
-            .unwrap();
-        self.handler
-            .do_send(RakServerEvent::Disconnected(self.addr, self.guid))
-            .unwrap();
+        unwrap_or_return!(self.server.do_send(ConnectionEnd(self.addr, self.guid)));
+        self.event(RakServerEvent::Disconnected(self.addr, self.guid), ctx);
         ctx.terminate();
     }
 }
