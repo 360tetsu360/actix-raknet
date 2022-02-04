@@ -86,7 +86,6 @@ fn basic() {
     System::run(||{
         let server_addr: SocketAddr = "127.0.0.1:19132".parse().unwrap();
         block_on(create_server(0x1919, server_addr, "MCPE;§5raknet rs;390;1.17.42;0;10;13253860892328930865;Bedrock level;Survival;1;19132;19133;".to_owned()));
-
         let client1_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let client1 = block_on(create_client(114514, client1_addr));
         client1.do_send(Connect(server_addr));

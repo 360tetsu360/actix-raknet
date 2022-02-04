@@ -6,10 +6,7 @@ use crate::{
     session::time,
     udp::{ReceivedUdp, SendUdp, UdpActor, UdpPacket},
 };
-use actix::{dev::ToEnvelope, io::SinkWrite, prelude::*};
-use bytes::BytesMut;
-use futures::StreamExt;
-use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+use actix::{dev::ToEnvelope, prelude::*};
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -34,23 +31,8 @@ where
     <T as actix::Actor>::Context: ToEnvelope<T, Pong>,
 {
     pub fn new(socket: tokio::net::UdpSocket, handler: Addr<T>) -> Addr<Self> {
-        let (sink, stream) = UdpFramed::new(socket, BytesCodec::new()).split();
         Self::create(|ctx| Self {
-            udp: UdpActor::create(|ctx2| {
-                ctx2.add_stream(stream.filter_map(
-                    |item: std::io::Result<(BytesMut, SocketAddr)>| async {
-                        item.map(|(data, sender)| UdpPacket {
-                            bytes: data,
-                            addr: sender,
-                        })
-                        .ok()
-                    },
-                ));
-                UdpActor {
-                    sink: SinkWrite::new(sink, ctx2),
-                    addr: ctx.address(),
-                }
-            }),
+            udp: UdpActor::new(socket, ctx.address()),
             handler,
         })
     }

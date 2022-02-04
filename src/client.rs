@@ -1,9 +1,7 @@
 use std::{net::SocketAddr, time::Duration};
 
-use actix::{dev::ToEnvelope, io::SinkWrite, prelude::*};
+use actix::{dev::ToEnvelope, prelude::*};
 use bytes::BytesMut;
-use futures::StreamExt;
-use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
 use crate::{
     macros::unwrap_or_return,
@@ -75,23 +73,8 @@ where
     <T as actix::Actor>::Context: ToEnvelope<T, RakClientEvent>,
 {
     pub fn init(socket: tokio::net::UdpSocket, guid: u64, handler: Addr<T>) -> ClientHandle {
-        let (sink, stream) = UdpFramed::new(socket, BytesCodec::new()).split();
         let addr = Self::create(|ctx| Self {
-            udp: UdpActor::create(|ctx2| {
-                ctx2.add_stream(stream.filter_map(
-                    |item: std::io::Result<(BytesMut, SocketAddr)>| async {
-                        item.map(|(data, sender)| UdpPacket {
-                            bytes: data,
-                            addr: sender,
-                        })
-                        .ok()
-                    },
-                ));
-                UdpActor {
-                    sink: SinkWrite::new(sink, ctx2),
-                    addr: ctx.address(),
-                }
-            }),
+            udp: UdpActor::new(socket, ctx.address()),
             guid,
             mediator: None,
             handler,
