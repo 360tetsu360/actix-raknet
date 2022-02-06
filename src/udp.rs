@@ -46,9 +46,9 @@ where
     T: Handler<ReceivedUdp>,
     <T as actix::Actor>::Context: ToEnvelope<T, ReceivedUdp>,
 {
-    pub fn new(socket: tokio::net::UdpSocket, handler: Addr<T>) -> Addr<Self> {
+    pub fn new(socket: tokio::net::UdpSocket, handler: Addr<T>, arbiter: &Arbiter) -> Addr<Self> {
         let (r, s) = socket.split();
-        Self::create(|_ctx| Self {
+        Self::start_in_arbiter(arbiter, |_ctx| Self {
             sender: Arc::new(Mutex::new(s)),
             receiver: Some(r),
             recv_handle: None,

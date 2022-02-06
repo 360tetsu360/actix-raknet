@@ -137,7 +137,7 @@ async fn main() {
     let server_guid = 114514;
     let socket = tokio::net::UdpSocket::bind(local_addr).await.unwrap();
     let _handler = Server::create(|ctx| {
-        let _rak_server = RakServer::new(socket, server_guid, motd, ctx.address());
+        let _rak_server = RakServer::new(socket, server_guid, motd, ctx.address(), 1);
         Server {
             _rak_server,
             client: None,

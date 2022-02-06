@@ -64,6 +64,8 @@ where
     tick_handle: Option<SpawnHandle>,
     remote: Option<SocketAddr>,
     disconnect_handle: Option<SpawnHandle>,
+
+    udp_worker: Arbiter,
 }
 
 impl<T> RakClient<T>
@@ -73,8 +75,9 @@ where
     <T as actix::Actor>::Context: ToEnvelope<T, RakClientEvent>,
 {
     pub fn init(socket: tokio::net::UdpSocket, guid: u64, handler: Addr<T>) -> ClientHandle {
+        let udp_worker = Arbiter::new();
         let addr = Self::create(|ctx| Self {
-            udp: UdpActor::new(socket, ctx.address()),
+            udp: UdpActor::new(socket, ctx.address(), &udp_worker),
             guid,
             mediator: None,
             handler,
@@ -82,6 +85,7 @@ where
             tick_handle: None,
             remote: None,
             disconnect_handle: None,
+            udp_worker,
         });
         ClientHandle {
             addr: addr.recipient::<RakClientMsg>(),
@@ -116,6 +120,9 @@ where
     <T as actix::Actor>::Context: ToEnvelope<T, RakClientEvent>,
 {
     type Context = Context<Self>;
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        self.udp_worker.stop();
+    }
 }
 
 impl<T> Handler<ReceivedUdp> for RakClient<T>

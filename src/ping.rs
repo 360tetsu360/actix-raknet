@@ -23,6 +23,8 @@ where
 {
     udp: Addr<UdpActor<Self>>,
     handler: Addr<T>,
+
+    udp_worker: Arbiter,
 }
 
 impl<T> RakPing<T>
@@ -31,9 +33,11 @@ where
     <T as actix::Actor>::Context: ToEnvelope<T, Pong>,
 {
     pub fn new(socket: tokio::net::UdpSocket, handler: Addr<T>) -> Addr<Self> {
+        let udp_worker = Arbiter::new();
         Self::create(|ctx| Self {
-            udp: UdpActor::new(socket, ctx.address()),
+            udp: UdpActor::new(socket, ctx.address(), &udp_worker),
             handler,
+            udp_worker,
         })
     }
 }
@@ -44,6 +48,10 @@ where
     <T as actix::Actor>::Context: ToEnvelope<T, Pong>,
 {
     type Context = Context<Self>;
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        self.udp_worker.stop()
+    }
 }
 
 impl<T> Handler<ReceivedUdp> for RakPing<T>

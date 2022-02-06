@@ -35,7 +35,7 @@ async fn main() {
     let server_guid = 114514;
     let socket = tokio::net::UdpSocket::bind(local_addr).await.unwrap();
     let _handler = Raknet::create(|ctx| {
-        let rak_server = RakServer::new(socket, server_guid, motd, ctx.address());
+        let rak_server = RakServer::new(socket, server_guid, motd, ctx.address(), 8);
         Raknet { rak_server }
     });
     actix_rt::Arbiter::local_join().await;

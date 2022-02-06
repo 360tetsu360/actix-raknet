@@ -45,6 +45,10 @@ where
     connected_id: Vec<u64>,
     motd: String,
     guid: u64,
+
+    udp_worker: Arbiter,
+
+    session_worker: SessionWorker,
 }
 
 impl<T> RakServer<T>
@@ -58,14 +62,18 @@ where
         guid: u64,
         motd: String,
         handler: Addr<T>,
+        thread: u32,
     ) -> Addr<Self> {
+        let udp_worker = Arbiter::new();
         Self::create(|ctx| Self {
-            udp: UdpActor::new(socket, ctx.address()),
+            udp: UdpActor::new(socket, ctx.address(), &udp_worker),
             handler,
             conns: HashMap::new(),
             connected_id: vec![],
             motd,
             guid,
+            udp_worker,
+            session_worker: SessionWorker::new(thread),
         })
     }
 }
@@ -77,6 +85,10 @@ where
     <T as actix::Actor>::Context: ToEnvelope<T, RakServerEvent>,
 {
     type Context = Context<Self>;
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        self.udp_worker.stop();
+        self.session_worker.stop();
+    }
 }
 
 impl<T> Handler<ReceivedUdp> for RakServer<T>
@@ -137,6 +149,8 @@ where
                     bytes: encode(reply2),
                     addr: msg.0.addr,
                 }));
+
+                let arbiter = self.session_worker.add(msg.0.addr);
                 self.conns.insert(
                     msg.0.addr,
                     ServerConn::new(
@@ -146,8 +160,10 @@ where
                         msg.0.addr,
                         self.handler.clone().recipient::<RakServerEvent>(),
                         ctx.address().recipient::<ConnectionEnd>(),
+                        arbiter,
                     ),
                 );
+
                 self.connected_id.push(request2.guid);
             }
             _ => {}
@@ -164,6 +180,7 @@ where
     type Result = ();
     fn handle(&mut self, msg: ConnectionEnd, _ctx: &mut Self::Context) -> Self::Result {
         self.conns.remove(&msg.0);
+        self.session_worker.delete(msg.0);
         if self.connected_id.contains(&msg.1) {
             let index = self.connected_id.iter().position(|x| *x == msg.1).unwrap();
             self.connected_id.remove(index);
@@ -180,6 +197,45 @@ where
     type Result = ();
     fn handle(&mut self, msg: SetMotd, _ctx: &mut Self::Context) -> Self::Result {
         self.motd = msg.0;
+    }
+}
+
+pub(crate) struct SessionWorker {
+    session: HashMap<SocketAddr, u32>,
+    workers: HashMap<u32, (Arbiter, u32)>,
+}
+
+impl SessionWorker {
+    pub fn new(threads: u32) -> Self {
+        let mut workers = HashMap::new();
+        for i in 0..threads {
+            let thread = Arbiter::new();
+            workers.insert(i, (thread, 0));
+        }
+        Self {
+            session: HashMap::new(),
+            workers,
+        }
+    }
+
+    pub fn add(&mut self, address: SocketAddr) -> &Arbiter {
+        let y = *self.workers.iter().min_by_key(|x| x.1 .1).unwrap().0;
+        self.workers.get_mut(&y).unwrap().1 += 1;
+        self.session.insert(address, y);
+        &self.workers.get(&y).unwrap().0
+    }
+
+    pub fn delete(&mut self, address: SocketAddr) {
+        if let Some(i) = self.session.remove(&address) {
+            self.workers.get_mut(&i).unwrap().1 -= 1;
+        }
+    }
+
+    pub fn stop(&mut self) {
+        for thread in self.workers.iter() {
+            let arbiter: &Arbiter = &thread.1 .0;
+            arbiter.stop()
+        }
     }
 }
 
@@ -200,8 +256,9 @@ impl ServerConn {
         addr: SocketAddr,
         handler: Recipient<RakServerEvent>,
         server: Recipient<ConnectionEnd>,
+        arbiter: &Arbiter,
     ) -> Addr<Self> {
-        ServerConn::create(|ctx| Self {
+        ServerConn::start_in_arbiter(arbiter, move |ctx| Self {
             session: Session::<Self>::new(addr, mtu, udp, ctx.address()),
             handler,
             server,
@@ -292,7 +349,6 @@ impl Handler<SessionEnd> for ServerConn {
 impl Handler<SendPacket> for ServerConn {
     type Result = ();
     fn handle(&mut self, msg: SendPacket, _ctx: &mut Self::Context) -> Self::Result {
-        dbg!();
         self.session.send_to(msg.0);
     }
 }

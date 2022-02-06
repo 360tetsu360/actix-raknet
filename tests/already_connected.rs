@@ -68,7 +68,7 @@ async fn create_client(guid: u64, addr: SocketAddr) -> Addr<Client> {
 async fn create_server(guid: u64, addr: SocketAddr, motd: String) -> Addr<Server> {
     let socket = tokio::net::UdpSocket::bind(addr).await.unwrap();
     Server::create(|ctx| {
-        RakServer::new(socket, guid, motd, ctx.address());
+        RakServer::new(socket, guid, motd, ctx.address(), 1);
         Server
     })
 }
