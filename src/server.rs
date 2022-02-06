@@ -292,6 +292,7 @@ impl Handler<SessionEnd> for ServerConn {
 impl Handler<SendPacket> for ServerConn {
     type Result = ();
     fn handle(&mut self, msg: SendPacket, _ctx: &mut Self::Context) -> Self::Result {
+        dbg!();
         self.session.send_to(msg.0);
     }
 }
