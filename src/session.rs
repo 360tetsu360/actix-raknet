@@ -264,11 +264,10 @@ pub(crate) struct ReceivedDatagram(pub Frame);
 pub(crate) struct SessionEnd;
 
 pub(crate) fn time() -> u128 {
-    std::convert::TryInto::try_into(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis(),
-    )
-    .unwrap_or(0)
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
+        .try_into()
+        .unwrap_or(0)
 }

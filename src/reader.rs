@@ -13,12 +13,12 @@ pub enum Endian {
 }
 
 #[derive(Clone)]
-pub struct Reader<'a> {
-    cursor: Cursor<&'a [u8]>,
+pub struct Reader<T: Read + AsRef<[u8]>> {
+    cursor: Cursor<T>,
 }
 
-impl<'a> Reader<'a> {
-    pub fn new(buf: &'a [u8]) -> Self {
+impl<T: Read + AsRef<[u8]>> Reader<T> {
+    pub fn new(buf: T) -> Self {
         Self {
             cursor: Cursor::new(buf),
         }
@@ -64,7 +64,7 @@ impl<'a> Reader<'a> {
         }
     }
 
-    pub fn read_string(&'a mut self) -> Result<String> {
+    pub fn read_string(&mut self) -> Result<String> {
         let size = self.read_u16(Endian::Big)?;
         let mut strbuf = vec![0u8; size.into()];
         self.read(&mut strbuf)?;
@@ -100,7 +100,7 @@ impl<'a> Reader<'a> {
             let mut addr_buf = [0; 16];
             self.cursor.read_exact(&mut addr_buf)?;
 
-            let mut address_cursor = Reader::new(&addr_buf);
+            let mut address_cursor = Reader::new(&addr_buf as &[u8]);
             self.next(4);
             Ok(SocketAddr::new(
                 IpAddr::V6(Ipv6Addr::new(

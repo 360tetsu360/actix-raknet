@@ -27,7 +27,7 @@ impl UnconnectedPong {
 
 impl Packet for UnconnectedPong {
     const ID: u8 = 0x1c;
-    fn read(payload: &[u8]) -> Result<Self> {
+    fn read<'a>(payload: &'a [u8]) -> Result<Self> {
         let mut cursor = Reader::new(payload);
         Ok(Self {
             time: cursor.read_i64(Endian::Big)?,

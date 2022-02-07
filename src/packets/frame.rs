@@ -9,7 +9,7 @@ use crate::{
     },
     writer::Writer,
 };
-
+use std::io::Read;
 use super::Reliability;
 const SPLIT_FLAG: u8 = 0x10;
 
@@ -61,7 +61,7 @@ impl Frame {
         ret += self.data.len();
         ret
     }
-    pub fn decode(cursor: &mut Reader<'_>) -> Result<Self> {
+    pub fn decode<T: Read + AsRef<[u8]>>(cursor: &mut Reader<T>) -> Result<Self> {
         let mut packet = Self {
             reliability: Reliability::new(0)?,
 
