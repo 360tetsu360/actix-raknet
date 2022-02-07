@@ -57,7 +57,12 @@ async fn main() {
     let socket = tokio::net::UdpSocket::bind(local_addr).await.unwrap();
     let server_guid = 114514;
     let client = Raknet::create(|ctx| {
-        let rak_client = RakClient::init(socket, server_guid, ctx.address());
+        let rak_client = RakClient::init(
+            socket,
+            server_guid,
+            ctx.address(),
+            System::current().arbiter(),
+        );
         Raknet { rak_client }
     });
     let remote_addr: SocketAddr = "127.0.0.1:19132".parse().unwrap();

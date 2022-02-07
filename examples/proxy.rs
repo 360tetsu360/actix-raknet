@@ -87,7 +87,12 @@ impl Handler<RakServerEvent> for Server {
                 let server_guid = handle.guid;
                 let socket = block_on(tokio::net::UdpSocket::bind(local_addr)).unwrap();
                 self.client = Some(Client::create(|ctx| {
-                    let rak_client = RakClient::init(socket, server_guid, ctx.address());
+                    let rak_client = RakClient::init(
+                        socket,
+                        server_guid,
+                        ctx.address(),
+                        System::current().arbiter(),
+                    );
                     Client {
                         rak_client,
                         server: sctx.address(),

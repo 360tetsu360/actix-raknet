@@ -70,9 +70,9 @@ impl Handler<RakServerEvent> for Server {
 
 async fn create_client(guid: u64, addr: SocketAddr) -> Addr<Client> {
     let socket = tokio::net::UdpSocket::bind(addr).await.unwrap();
-    let server_addr: SocketAddr = "127.0.0.1:19132".parse().unwrap();
+    let server_addr: SocketAddr = "127.0.0.1:19141".parse().unwrap();
     Client::create(|ctx| {
-        let rak_client = RakClient::init(socket, guid, ctx.address());
+        let rak_client = RakClient::init(socket, guid, ctx.address(), System::current().arbiter());
         Client {
             rak_client,
             connected_count: 0,
@@ -92,7 +92,7 @@ async fn create_server(guid: u64, addr: SocketAddr, motd: String) -> Addr<Server
 #[test]
 fn multi() {
     System::run(||{
-        let server_addr: SocketAddr = "127.0.0.1:19132".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19141".parse().unwrap();
         block_on(create_server(0x1919, server_addr, "MCPE;§5raknet rs;390;1.17.42;0;10;13253860892328930865;Bedrock level;Survival;1;19132;19133;".to_owned()));
 
         let client1_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();

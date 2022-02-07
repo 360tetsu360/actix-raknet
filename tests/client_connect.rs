@@ -49,7 +49,7 @@ struct Connect(SocketAddr);
 async fn creat_client(guid: u64, addr: SocketAddr) -> Addr<Client> {
     let socket = tokio::net::UdpSocket::bind(addr).await.unwrap();
     Client::create(|ctx| {
-        let rak_client = RakClient::init(socket, guid, ctx.address());
+        let rak_client = RakClient::init(socket, guid, ctx.address(), System::current().arbiter());
         Client { rak_client }
     })
 }
@@ -57,7 +57,7 @@ async fn creat_client(guid: u64, addr: SocketAddr) -> Addr<Client> {
 #[test]
 fn mtu() {
     System::run(|| {
-        let server_addr: SocketAddr = "127.0.0.1:19130".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19135".parse().unwrap();
         let mut socket = block_on(tokio::net::UdpSocket::bind(server_addr)).unwrap();
         tokio::spawn(async move {
             loop {
@@ -76,7 +76,7 @@ fn mtu() {
 #[test]
 fn connection_failed() {
     System::run(|| {
-        let server_addr: SocketAddr = "127.0.0.1:19131".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19136".parse().unwrap();
         let mut socket = block_on(tokio::net::UdpSocket::bind(server_addr)).unwrap();
         tokio::spawn(async move {
             loop {
@@ -100,7 +100,7 @@ fn connection_failed() {
 #[test]
 fn different_version() {
     System::run(|| {
-        let server_addr: SocketAddr = "127.0.0.1:19132".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19137".parse().unwrap();
         let mut socket = block_on(tokio::net::UdpSocket::bind(server_addr)).unwrap();
         tokio::spawn(async move {
             loop {
@@ -124,7 +124,7 @@ fn different_version() {
 #[test]
 fn already_connected() {
     System::run(|| {
-        let server_addr: SocketAddr = "127.0.0.1:19133".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19138".parse().unwrap();
         let mut socket = block_on(tokio::net::UdpSocket::bind(server_addr)).unwrap();
         tokio::spawn(async move {
             loop {
@@ -148,7 +148,7 @@ fn already_connected() {
 #[test]
 fn timeout() {
     System::run(|| {
-        let server_addr: SocketAddr = "127.0.0.1:19134".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19139".parse().unwrap();
         let mut socket = block_on(tokio::net::UdpSocket::bind(server_addr)).unwrap();
         tokio::spawn(async move {
             loop {

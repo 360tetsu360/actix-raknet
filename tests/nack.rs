@@ -49,7 +49,7 @@ struct Connect(SocketAddr);
 async fn creat_client(guid: u64, addr: SocketAddr) -> Addr<Client> {
     let socket = tokio::net::UdpSocket::bind(addr).await.unwrap();
     Client::create(|ctx| {
-        let rak_client = RakClient::init(socket, guid, ctx.address());
+        let rak_client = RakClient::init(socket, guid, ctx.address(), System::current().arbiter());
         Client { rak_client }
     })
 }
@@ -63,7 +63,7 @@ const NEEDS_B_AND_AS_FLAG: u8 = 0x4;
 #[test]
 fn recv_nack() {
     System::run(|| {
-        let server_addr: SocketAddr = "127.0.0.1:19132".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19142".parse().unwrap();
         let mut socket = block_on(tokio::net::UdpSocket::bind(server_addr)).unwrap();
         tokio::spawn(async move {
             loop {
@@ -98,7 +98,7 @@ fn recv_nack() {
 #[test]
 fn send_nack() {
     System::run(|| {
-        let server_addr: SocketAddr = "127.0.0.1:19133".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19143".parse().unwrap();
         let mut socket = block_on(tokio::net::UdpSocket::bind(server_addr)).unwrap();
         tokio::spawn(async move {
             loop {

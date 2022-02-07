@@ -57,7 +57,7 @@ async fn create_ping(addr: SocketAddr) -> Addr<Ping> {
 #[test]
 fn ping() {
     System::run(||{
-        let server_addr: SocketAddr = "127.0.0.1:19132".parse().unwrap();
+        let server_addr: SocketAddr = "127.0.0.1:19144".parse().unwrap();
         block_on(create_server(0x1919, server_addr, "MCPE;§5raknet rs;390;1.17.42;0;10;13253860892328930865;Bedrock level;Survival;1;19132;19133;".to_owned()));
 
         let ping_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();

@@ -74,9 +74,14 @@ where
     T: Handler<RakClientEvent>,
     <T as actix::Actor>::Context: ToEnvelope<T, RakClientEvent>,
 {
-    pub fn init(socket: tokio::net::UdpSocket, guid: u64, handler: Addr<T>) -> ClientHandle {
+    pub fn init(
+        socket: tokio::net::UdpSocket,
+        guid: u64,
+        handler: Addr<T>,
+        arbiter: &Arbiter,
+    ) -> ClientHandle {
         let udp_worker = Arbiter::new();
-        let addr = Self::create(|ctx| Self {
+        let addr = Self::start_in_arbiter(arbiter, move |ctx| Self {
             udp: UdpActor::new(socket, ctx.address(), &udp_worker),
             guid,
             mediator: None,

@@ -86,7 +86,7 @@ impl Handler<RakServerEvent> for Server {
 async fn create_client(guid: u64, addr: SocketAddr) -> Addr<Client> {
     let socket = tokio::net::UdpSocket::bind(addr).await.unwrap();
     Client::create(|ctx| {
-        let rak_client = RakClient::init(socket, guid, ctx.address());
+        let rak_client = RakClient::init(socket, guid, ctx.address(), System::current().arbiter());
         Client { rak_client }
     })
 }

@@ -2,6 +2,7 @@ use std::io::Result;
 
 use bytes::BytesMut;
 
+use super::Reliability;
 use crate::{
     reader::{
         Endian::{self, Big, Little},
@@ -10,7 +11,6 @@ use crate::{
     writer::Writer,
 };
 use std::io::Read;
-use super::Reliability;
 const SPLIT_FLAG: u8 = 0x10;
 
 #[derive(Clone)]

@@ -268,6 +268,4 @@ pub(crate) fn time() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_millis()
-        .try_into()
-        .unwrap_or(0)
 }
